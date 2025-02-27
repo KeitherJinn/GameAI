@@ -169,7 +169,6 @@ PathResult AStarPather::compute_path(PathRequest &request)
                 bool move2 = false;
                 bool move3 = false;
                 bool move4 = false;
-                request.path.push_front(request.goal);
                 while (temp->gridPos != start) {
                     temp = temp->parent;
                     Vec3 point1 = XMVectorCatmullRom(terrain->get_world_position(n1->gridPos), terrain->get_world_position(n2->gridPos), terrain->get_world_position(n3->gridPos), terrain->get_world_position(n4->gridPos), 0.25);
