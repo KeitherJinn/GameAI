@@ -14,20 +14,9 @@ struct Node {
     Node() :parent(nullptr), gridPos(GridPos(0, 0)), finalCost(0), givenCost(0), onlist(onNone) {}
 };
 
-struct CMP {
-    bool operator()(const Node* a, const Node* b) const {
-        return a->finalCost > b->finalCost;
-    }
-};
-
 class AStarPather
 {
 public:
-    /* 
-        The class should be default constructible, so you might need to define a constructor.
-        If needed, you can modify the framework where the class is constructed in the
-        initialize functions of ProjectTwo and ProjectThree.
-    */
     AStarPather();
     /* ************************************************** */
     // DO NOT MODIFY THESE SIGNATURES
@@ -45,13 +34,11 @@ public:
     float calculateCost(Heuristic h, GridPos a, GridPos b);
     void setChild(Node* child, PathRequest& request, Node* parent, GridPos goal);
     bool checkRubberBanding(GridPos a, GridPos b);
-    /*
-        You should create whatever functions, variables, or classes you need.
-        It doesn't all need to be in this header and cpp, structure it whatever way
-        makes sense to you.
-    */
+    Node supportPoint(Node* n1, Node* n2);
+    Node* popSmallest();
+
 private:
     Node map[40][40];
-    std::priority_queue<Node*, std::vector<Node*>, CMP> openlist;
+    std::vector<Node*> openlist;
 };
 

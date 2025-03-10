@@ -2,6 +2,7 @@
 #include "Projects/ProjectTwo.h"
 #include "P2_Pathfinding.h"
 
+
 #pragma region Extra Credit 
 bool ProjectTwo::implemented_floyd_warshall()
 {
@@ -15,9 +16,7 @@ bool ProjectTwo::implemented_goal_bounding()
 #pragma endregion
 
 AStarPather::AStarPather() {
-    while (!openlist.empty()) {
-        openlist.pop();
-    }
+    openlist.clear();
     std::cout << "    Initializing pather..." << std::endl;
 }
 
@@ -30,9 +29,7 @@ bool AStarPather::initialize()
             map[i][j].onlist = onNone;
         }
     }
-    while (!openlist.empty()) {
-        openlist.pop();
-    }
+    openlist.clear();
     /*
         If you want to do any map-preprocessing, you'll need to listen
         for the map change message.  It'll look something like this:
@@ -92,23 +89,6 @@ PathResult AStarPather::compute_path(PathRequest &request)
             IMPOSSIBLE - a path from start to goal does not exist, do not add start position to path
     */
 
-    // WRITE YOUR CODE HERE
-    //While(Open List is not empty) {
-    //    parentNode = Pop cheapest node off Open List.
-    //        If parentNode is the Goal Node, then path found(return PathResult::COMPLETE).
-    //        Place parentNode on the Closed List.
-    //        For(all neighboring child nodes of parentNode) {
-    //        Compute its cost, f(x) = g(x) + h(x)
-    //            If child node isn¡¯t on Open or Closed list, put it on Open List.
-    //            Else if child node is on Open or Closed List, AND this new one is cheaper,
-    //            then take the old expensive one off both lists and put this new
-    //            cheaper one on the Open List.
-    //    }
-    //    If taken too much time this frame(or if request.settings.singleStep == true),
-    //        abort search for now and resume next frame(return PathResult::PROCESSING).
-    //}
-    //Open List empty, thus no path possible(return PathResult::IMPOSSIBLE).
-
     GridPos start = terrain->get_grid_position(request.start);
     GridPos goal = terrain->get_grid_position(request.goal);
     GridPos g1, g2, g3, g4, g5, g6, g7, g8;
@@ -121,17 +101,16 @@ PathResult AStarPather::compute_path(PathRequest &request)
     bool sign = true;
     std::vector<Vec3> list;
     list.clear();
-    // Just sample code, safe to delete
     if (request.newRequest) {
         initialize();
         map[start.row][start.col].givenCost = 0;
         map[start.row][start.col].finalCost = request.settings.weight * calculateCost(request.settings.heuristic, start, goal);
         map[start.row][start.col].onlist = onOpen;
-        openlist.push(&map[start.row][start.col]);
+        openlist.push_back(&map[start.row][start.col]);
     }
     while (!openlist.empty()) {
-        parent = openlist.top();
-        openlist.pop();
+        parent = popSmallest();
+        
         if (parent->gridPos == goal) {
             temp = parent;
             if (request.settings.rubberBanding) {
@@ -173,13 +152,25 @@ PathResult AStarPather::compute_path(PathRequest &request)
                 request.path.clear();
                 request.path.push_front(request.goal);
                 while (temp->gridPos != start) {
+                    Vec3 point0, point1, point2, point3;
+                    if (request.settings.rubberBanding) {
+                        for (int i = 0; i < 10; i++) {
+                            point0 = XMVectorCatmullRom(terrain->get_world_position(n1->gridPos), terrain->get_world_position(n1->gridPos), terrain->get_world_position(n2->gridPos), terrain->get_world_position(n2->gridPos), 0 + (9 - i) * 0.1);
+                            request.path.push_front(point0);
+                        }
+                    }
+                    else {
+                        point0 = XMVectorCatmullRom(terrain->get_world_position(n1->gridPos), terrain->get_world_position(n2->gridPos), terrain->get_world_position(n3->gridPos), terrain->get_world_position(n4->gridPos), 0);
+                        point1 = XMVectorCatmullRom(terrain->get_world_position(n1->gridPos), terrain->get_world_position(n2->gridPos), terrain->get_world_position(n3->gridPos), terrain->get_world_position(n4->gridPos), 0.25);
+                        point2 = XMVectorCatmullRom(terrain->get_world_position(n1->gridPos), terrain->get_world_position(n2->gridPos), terrain->get_world_position(n3->gridPos), terrain->get_world_position(n4->gridPos), 0.5);
+                        point3 = XMVectorCatmullRom(terrain->get_world_position(n1->gridPos), terrain->get_world_position(n2->gridPos), terrain->get_world_position(n3->gridPos), terrain->get_world_position(n4->gridPos), 0.75);
+                        request.path.push_front(point3);
+                        request.path.push_front(point2);
+                        request.path.push_front(point1);
+                        request.path.push_front(point0);
+                    }
+
                     temp = temp->parent;
-                    Vec3 point1 = XMVectorCatmullRom(terrain->get_world_position(n1->gridPos), terrain->get_world_position(n2->gridPos), terrain->get_world_position(n3->gridPos), terrain->get_world_position(n4->gridPos), 0.25);
-                    Vec3 point2 = XMVectorCatmullRom(terrain->get_world_position(n1->gridPos), terrain->get_world_position(n2->gridPos), terrain->get_world_position(n3->gridPos), terrain->get_world_position(n4->gridPos), 0.5);
-                    Vec3 point3 = XMVectorCatmullRom(terrain->get_world_position(n1->gridPos), terrain->get_world_position(n2->gridPos), terrain->get_world_position(n3->gridPos), terrain->get_world_position(n4->gridPos), 0.75);
-                    request.path.push_front(point3);
-                    request.path.push_front(point2);
-                    request.path.push_front(point1);
 
                     if (move1 && n1->gridPos != start) {
                         n1 = n1->parent;
@@ -190,26 +181,29 @@ PathResult AStarPather::compute_path(PathRequest &request)
                                 if (move4 && n4->gridPos != start) {
                                     n4 = n4->parent;
                                 }
-                                else {
+                                else if (n4->gridPos != start) {
                                     n4 = n4->parent;
                                     move4 = true;
                                 }
+                                else move4 = false;
                             }
-                            else {
+                            else if (n3->gridPos != start) {
                                 n3 = n3->parent;
                                 move3 = true;
                             }
+                            else move3 = false;
                         }
-                        else {
+                        else if (n2->gridPos != start) {
                             n2 = n2->parent;
                             move2 = true;
                         }
+                        else move2 = false;
                     }
-                    else {
+                    else if (n1->gridPos != start) {
                         n1 = n1->parent;
                         move1 = true;
                     }
-                    
+                    else move1 = false;
                 }
                 request.path.push_front(request.start);
             }
@@ -233,195 +227,44 @@ PathResult AStarPather::compute_path(PathRequest &request)
         g6 = GridPos(parent->gridPos.row - 1, parent->gridPos.col - 1);
         g7 = GridPos(parent->gridPos.row + 1, parent->gridPos.col);
         g8 = GridPos(parent->gridPos.row - 1, parent->gridPos.col);
-
+        
         if (terrain->is_valid_grid_position(g1)) {
             child = &map[parent->gridPos.row][parent->gridPos.col + 1];
-            if (!terrain->is_wall(child->gridPos) &&
-                terrain->is_valid_grid_position(child->gridPos)) {
-                if (child->onlist == onNone) {
-                    child->onlist = onOpen;
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    diffCol = abs(parent->gridPos.row - child->gridPos.row);
-                    diffRow = abs(parent->gridPos.col - child->gridPos.col);
-                    child->givenCost = parent->givenCost + sqrt(diffRow * diffRow + diffCol * diffCol);
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-                else if ((child->onlist == onOpen || child->onlist == onClosed) && child->finalCost > child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal)) {
-                    child->onlist = onOpen;
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-            }
+            setChild(child, request, parent, goal);
         }
         if (terrain->is_valid_grid_position(g2)) {
             child = &map[parent->gridPos.row][parent->gridPos.col - 1];
-            if (!terrain->is_wall(child->gridPos) &&
-                terrain->is_valid_grid_position(child->gridPos)) {
-                if (child->onlist == onNone) {
-                    child->onlist = onOpen;
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    diffCol = abs(parent->gridPos.row - child->gridPos.row);
-                    diffRow = abs(parent->gridPos.col - child->gridPos.col);
-                    child->givenCost = parent->givenCost + sqrt(diffRow * diffRow + diffCol * diffCol);
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-                else if ((child->onlist == onOpen || child->onlist == onClosed) && child->finalCost > child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal)) {
-                    child->onlist = onOpen;
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-            }
+            setChild(child, request, parent, goal);
         }
         if (terrain->is_valid_grid_position(g3) && !terrain->is_wall(g1) && !terrain->is_wall(g7)) {
             child = &map[parent->gridPos.row + 1][parent->gridPos.col + 1];
-            if (!terrain->is_wall(child->gridPos) &&
-                terrain->is_valid_grid_position(child->gridPos)) {
-                if (child->onlist == onNone) {
-                    child->onlist = onOpen;
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    diffCol = abs(parent->gridPos.row - child->gridPos.row);
-                    diffRow = abs(parent->gridPos.col - child->gridPos.col);
-                    child->givenCost = parent->givenCost + sqrt(diffRow * diffRow + diffCol * diffCol);
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-                else if ((child->onlist == onOpen || child->onlist == onClosed) && child->finalCost > child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal)) {
-                    child->onlist = onOpen;
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-            }
+            setChild(child, request, parent, goal);
         }
         if (terrain->is_valid_grid_position(g4) && !terrain->is_wall(g1) && !terrain->is_wall(g8)) {
             child = &map[parent->gridPos.row - 1][parent->gridPos.col + 1];
-            if (!terrain->is_wall(child->gridPos) &&
-                terrain->is_valid_grid_position(child->gridPos)) {
-                if (child->onlist == onNone) {
-                    child->onlist = onOpen;
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    diffCol = abs(parent->gridPos.row - child->gridPos.row);
-                    diffRow = abs(parent->gridPos.col - child->gridPos.col);
-                    child->givenCost = parent->givenCost + sqrt(diffRow * diffRow + diffCol * diffCol);
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-                else if ((child->onlist == onOpen || child->onlist == onClosed) && child->finalCost > child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal)) {
-                    child->onlist = onOpen;
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-            }
+            setChild(child, request, parent, goal);
         }
         if (terrain->is_valid_grid_position(g5) && !terrain->is_wall(g2) && !terrain->is_wall(g7)) {
             child = &map[parent->gridPos.row + 1][parent->gridPos.col - 1];
-            if (!terrain->is_wall(child->gridPos) &&
-                terrain->is_valid_grid_position(child->gridPos)) {
-                if (child->onlist == onNone) {
-                    child->onlist = onOpen;
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    diffCol = abs(parent->gridPos.row - child->gridPos.row);
-                    diffRow = abs(parent->gridPos.col - child->gridPos.col);
-                    child->givenCost = parent->givenCost + sqrt(diffRow * diffRow + diffCol * diffCol);
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-                else if ((child->onlist == onOpen || child->onlist == onClosed) && child->finalCost > child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal)) {
-                    child->onlist = onOpen;
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-            }
+            setChild(child, request, parent, goal);
         }
         if (terrain->is_valid_grid_position(g6) && !terrain->is_wall(g2) && !terrain->is_wall(g8)) {
             child = &map[parent->gridPos.row - 1][parent->gridPos.col - 1];
-            if (!terrain->is_wall(child->gridPos) &&
-                terrain->is_valid_grid_position(child->gridPos)) {
-                if (child->onlist == onNone) {
-                    child->onlist = onOpen;
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    diffCol = abs(parent->gridPos.row - child->gridPos.row);
-                    diffRow = abs(parent->gridPos.col - child->gridPos.col);
-                    child->givenCost = parent->givenCost + sqrt(diffRow * diffRow + diffCol * diffCol);
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-                else if ((child->onlist == onOpen || child->onlist == onClosed) && child->finalCost > child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal)) {
-                    child->onlist = onOpen;
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-            }
+            setChild(child, request, parent, goal);
         }
         if (terrain->is_valid_grid_position(g7)) {
             child = &map[parent->gridPos.row + 1][parent->gridPos.col];
-            if (!terrain->is_wall(child->gridPos) &&
-                terrain->is_valid_grid_position(child->gridPos)) {
-                if (child->onlist == onNone) {
-                    child->onlist = onOpen;
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    diffCol = abs(parent->gridPos.row - child->gridPos.row);
-                    diffRow = abs(parent->gridPos.col - child->gridPos.col);
-                    child->givenCost = parent->givenCost + sqrt(diffRow * diffRow + diffCol * diffCol);
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-                else if ((child->onlist == onOpen || child->onlist == onClosed) && child->finalCost > child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal)) {
-                    child->onlist = onOpen;
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-            }
+            setChild(child, request, parent, goal);
         }
         if (terrain->is_valid_grid_position(g8)) {
             child = &map[parent->gridPos.row - 1][parent->gridPos.col];
-            if (!terrain->is_wall(child->gridPos) &&
-                terrain->is_valid_grid_position(child->gridPos)) {
-                if (child->onlist == onNone) {
-                    child->onlist = onOpen;
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    diffCol = abs(parent->gridPos.row - child->gridPos.row);
-                    diffRow = abs(parent->gridPos.col - child->gridPos.col);
-                    child->givenCost = parent->givenCost + sqrt(diffRow * diffRow + diffCol * diffCol);
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-                else if ((child->onlist == onOpen || child->onlist == onClosed) && child->finalCost > child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal)) {
-                    child->onlist = onOpen;
-                    child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-                    if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-                    openlist.push(child);
-                    child->parent = parent;
-                }
-            }
+            setChild(child, request, parent, goal);
         }
 
         if (request.settings.singleStep == true) {
             return PathResult::PROCESSING;
         }
+
     }
     return PathResult::IMPOSSIBLE;
 }
@@ -455,27 +298,46 @@ float AStarPather::calculateCost(Heuristic h, GridPos a, GridPos b) {
     }
 }
 
+bool cmpNode(const Node* a, const Node* b) {
+    return a->finalCost > b->finalCost;
+}
+
 void AStarPather::setChild(Node* child, PathRequest& request, Node* parent, GridPos goal) {
+    float diffCol = abs(parent->gridPos.row - child->gridPos.row);
+    float diffRow = abs(parent->gridPos.col - child->gridPos.col);
     if (!terrain->is_wall(child->gridPos) &&
         terrain->is_valid_grid_position(child->gridPos)) {
         if (child->onlist == onNone) {
             child->onlist = onOpen;
             if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-            float diffCol = abs(parent->gridPos.row - child->gridPos.row);
-            float diffRow = abs(parent->gridPos.col - child->gridPos.col);
             child->givenCost = parent->givenCost + sqrt(diffRow * diffRow + diffCol * diffCol);
             child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
-            openlist.push(child);
+            openlist.push_back(child);
             child->parent = parent;
         }
-        else if ((child->onlist == onOpen || child->onlist == onClosed) && child->finalCost > child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal)) {
-            child->onlist = onOpen;
+        else if ((child->onlist == onOpen || child->onlist == onClosed) && child->givenCost > parent->givenCost + sqrt(diffRow * diffRow + diffCol * diffCol)) {
+            child->givenCost = parent->givenCost + sqrt(diffRow * diffRow + diffCol * diffCol);
             child->finalCost = child->givenCost + request.settings.weight * calculateCost(request.settings.heuristic, child->gridPos, goal);
             if (request.settings.debugColoring) terrain->set_color(child->gridPos, Colors::Blue);
-            openlist.push(child);
+            if (child->onlist == onClosed) openlist.push_back(child);
+            child->onlist = onOpen;
             child->parent = parent;
         }
     }
+}
+
+Node* AStarPather::popSmallest() {
+    float val = INFINITY;
+    int pos = 0;
+    for (int i = 0; i < openlist.size(); i++) {
+        if (openlist[i]->finalCost < val) {
+            val = openlist[i]->finalCost;
+            pos = i;
+        }
+    }
+    Node* temp = openlist[pos];
+    openlist.erase(openlist.begin() + pos);
+    return temp;
 }
 
 float AStarPather::euclidian(GridPos a, GridPos b) {
@@ -502,3 +364,4 @@ float AStarPather::inconsistent(GridPos a, GridPos b) {
 float AStarPather::manhattan(GridPos a, GridPos b) {
     return abs(a.col - b.col) + abs(a.row - b.row);
 }
+
