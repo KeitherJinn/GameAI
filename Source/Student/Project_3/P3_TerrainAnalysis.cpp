@@ -12,8 +12,15 @@ bool ProjectThree::implemented_fog_of_war() const // extra credit
     return false;
 }
 
+float euclidian(GridPos a, GridPos b) {
+    float diffCol = abs(a.col - b.col);
+    float diffRow = abs(a.row - b.row);
+    return sqrt(diffCol * diffCol + diffRow * diffRow);
+}
+
 float distance_to_closest_wall(int row, int col)
 {
+    GridPos g = GridPos(row, col);
     /*
         Check the euclidean distance from the given cell to every other wall cell,
         with cells outside the map bounds treated as walls, and return the smallest
@@ -21,10 +28,17 @@ float distance_to_closest_wall(int row, int col)
         functions in the global terrain to determine if a cell is within map bounds
         and a wall, respectively.
     */
+    float dist = INFINITY;
+    for (int i = -1; i <= 40; i++) {
+        for (int j = -1; j <= 40; j++) {
+            if (!terrain->is_valid_grid_position(i, j) || terrain->is_wall(i, j)) {
+                GridPos temp = GridPos(i, j);
+                dist = fmin(dist, euclidian(g, temp));
+            }
+        }
+    }
 
-    // WRITE YOUR CODE HERE
-    
-    return 0.0f; // REPLACE THIS
+    return dist;
 }
 
 bool is_clear_path(int row0, int col0, int row1, int col1)
@@ -37,10 +51,30 @@ bool is_clear_path(int row0, int col0, int row1, int col1)
         line_intersect helper function for the intersection test and the is_wall member
         function in the global terrain to determine if a cell is a wall or not.
     */
+    Vec2 p1 = Vec2(row0, col0);
+    Vec2 p2 = Vec2(row1, col1);
 
-    // WRITE YOUR CODE HERE
+    int r0 = fmin(row0, row1);
+    int r1 = fmax(row0, row1);
+    int c0 = fmin(col0, col1);
+    int c1 = fmax(col0, col1);
 
-    return false; // REPLACE THIS
+    for (int i = r0; i <= r1; i++) {
+        for (int j = r0; j <= r1; j++) {
+            if (!terrain->is_valid_grid_position(i, j) || terrain->is_wall(i, j)) {
+                Vec2 vert1 = Vec2(i + 0.5, j + 0.5);
+                Vec2 vert2 = Vec2(i + 0.5, j - 0.5);
+                Vec2 vert3 = Vec2(i - 0.5, j + 0.5);
+                Vec2 vert4 = Vec2(i - 0.5, j - 0.5);
+                if (line_intersect(p1, p2, vert1, vert2)) return true;
+                if (line_intersect(p1, p2, vert2, vert3)) return true;
+                if (line_intersect(p1, p2, vert3, vert4)) return true;
+                if (line_intersect(p1, p2, vert4, vert1)) return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 void analyze_openness(MapLayer<float> &layer)
